@@ -1,104 +1,19 @@
 <?php
 require __DIR__ . '/database.php';
-
-$today = date('Y-m-d');
-
-$stmt = $db->prepare(
-    'SELECT * FROM lunches WHERE lunch_date = ? ORDER BY id DESC'
-);
-$stmt->execute([$today]);
-$lunches = $stmt->fetchAll();
-$totalToday = count($lunches);
-
-$schedule = [
-    ['08:00–09:00 AM', 'Breakfast', 'Idli / dosa / chapati + egg'],
-    ['10:30–11:00 AM', 'Morning Snack', 'Banana or another fruit'],
-    ['12:00–01:00 PM', 'Lunch', 'Rice + vegetables + fish/chicken/egg/dal'],
-    ['04:30–05:00 PM', 'Evening Snack', 'Milk + guava + peanuts/almonds'],
-    ['08:00–09:00 PM', 'During Duty', '2 boiled eggs + banana'],
-    ['10:15–10:45 PM', 'Dinner', 'Rice + fish/egg/chicken + vegetables']
-];
-
-function displayDate(string $iso): string {
-    $time = strtotime($iso);
-    return $time ? date('d-m-Y', $time) : $iso;
-}
+$today=date('Y-m-d');
+$stmt=$db->prepare('SELECT * FROM lunches WHERE lunch_date=? ORDER BY meal_time ASC,id DESC');$stmt->execute([$today]);$lunches=$stmt->fetchAll();
+$totalToday=count($lunches);$totalAll=(int)$db->query('SELECT COUNT(*) FROM lunches')->fetchColumn();$daysLogged=(int)$db->query('SELECT COUNT(DISTINCT lunch_date) FROM lunches')->fetchColumn();
+$schedule=[['08:00','09:00','Breakfast','Idli / dosa / chapati + egg','🍳'],['10:30','11:00','Morning Snack','Banana or another fruit','🍌'],['12:00','13:00','Lunch','Rice + vegetables + fish/chicken/egg/dal','🍚'],['16:30','17:00','Evening Snack','Milk + guava + peanuts/almonds','🥛'],['20:00','21:00','During Duty','2 boiled eggs + banana','🥚'],['22:15','22:45','Dinner','Rice + fish/egg/chicken + vegetables','🍛']];
+function displayDate(string $iso):string{$time=strtotime($iso);return $time?date('d-m-Y',$time):$iso;}function displayTime(string $iso):string{$time=strtotime($iso);return $time?date('h:i A',$time):$iso;}
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Food Log & Timetable</title>
+<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172554"><title>Food Log Dashboard</title>
 <style>
-*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827}.container{width:100%;max-width:760px;margin:auto;padding:16px}.header{background:#111827;color:#fff;padding:22px;border-radius:16px;margin-bottom:16px}.header h1{margin:0 0 6px;font-size:25px}.header p{margin:0;opacity:.8}.card{background:#fff;border-radius:16px;padding:18px;margin-bottom:16px;box-shadow:0 3px 12px rgba(0,0,0,.07)}.card h2{margin-top:0;font-size:19px}label{display:block;font-weight:bold;margin-top:12px}input,textarea,select,button{width:100%;padding:13px;margin-top:7px;border-radius:10px;font-size:16px}input,textarea,select{border:1px solid #d1d5db}textarea{min-height:80px;resize:vertical}button{border:0;background:#111827;color:#fff;font-weight:bold;margin-top:16px}.date-help{color:#6b7280;font-size:13px;margin-top:5px}.schedule{display:grid;gap:8px}.meal-row{display:grid;grid-template-columns:125px 1fr;gap:10px;padding:11px;background:#f9fafb;border-radius:10px}.meal-time{font-weight:bold}.meal-food{color:#4b5563;font-size:14px}.item{padding:12px 0;border-bottom:1px solid #e5e7eb}.item:last-child{border-bottom:0}.food{font-weight:bold;font-size:17px}.meta{color:#374151;margin-top:4px}.quantity{color:#6b7280;margin-top:4px}.notes{color:#4b5563;margin-top:5px}.nav{display:grid;grid-template-columns:1fr 1fr;gap:10px}.nav a{text-decoration:none;text-align:center;background:#eef2ff;color:#111827;padding:13px;border-radius:10px;font-weight:bold}.empty{color:#6b7280;text-align:center;padding:15px}.alert-banner{position:fixed;left:16px;right:16px;bottom:16px;max-width:728px;margin:auto;background:#111827;color:white;padding:16px;border-radius:14px;box-shadow:0 8px 30px rgba(0,0,0,.25);transform:translateY(150%);transition:.3s;z-index:20}.alert-banner.show{transform:translateY(0)}.notify-btn{background:#374151;margin-top:10px}@media(max-width:500px){.meal-row{grid-template-columns:1fr}.nav{grid-template-columns:1fr}}
-</style>
-</head>
-<body>
-<div class="container">
-<div class="header"><h1>🍽️ Food Log & Timetable</h1><p>Track your meals and get time-based reminders.</p></div>
-
-<div class="card">
-<h2>⏰ Daily Food Timetable</h2>
-<div class="schedule">
-<?php foreach ($schedule as $meal): ?>
-<div class="meal-row"><div class="meal-time"><?= htmlspecialchars($meal[0]) ?><br><strong><?= htmlspecialchars($meal[1]) ?></strong></div><div class="meal-food"><?= htmlspecialchars($meal[2]) ?></div></div>
-<?php endforeach; ?>
-</div>
-<button type="button" class="notify-btn" onclick="requestMealNotifications(); alert('Notification permission requested. Keep this page open for time reminders.');">🔔 Enable Meal Notifications</button>
-</div>
-
-<div class="card">
-<h2>Add Food Entry</h2>
-<form method="post" action="save.php" id="foodForm">
-<label>Date</label>
-<input type="text" id="date_display" value="<?= htmlspecialchars(displayDate($today)) ?>" placeholder="DD-MM-YYYY" inputmode="numeric" maxlength="10" autocomplete="off" required>
-<input type="hidden" name="lunch_date" id="lunch_date" value="<?= htmlspecialchars($today) ?>">
-<div class="date-help">Enter date as DD-MM-YYYY, for example: 26-08-2026</div>
-<label>Meal Time</label>
-<select name="meal_type" required>
-<option value="Breakfast">08:00–09:00 AM — Breakfast</option>
-<option value="Morning Snack">10:30–11:00 AM — Morning Snack</option>
-<option value="Lunch" selected>12:00–01:00 PM — Lunch</option>
-<option value="Evening Snack">04:30–05:00 PM — Evening Snack</option>
-<option value="During Duty">08:00–09:00 PM — During Duty</option>
-<option value="Dinner">10:15–10:45 PM — Dinner</option>
-</select>
-<label>Food Item</label><input type="text" name="food_item" placeholder="Example: Rice + Fish Curry" required>
-<label>Quantity</label><input type="text" name="quantity" placeholder="Example: 1 plate">
-<label>Notes</label><textarea name="notes" placeholder="Optional notes"></textarea>
-<button type="submit">Save Food Entry</button>
-</form>
-</div>
-
-<div class="card"><h2>Today's Entries (<?= $totalToday ?>)</h2>
-<?php if (!$lunches): ?><div class="empty">No food recorded for <?= htmlspecialchars(displayDate($today)) ?>.</div>
-<?php else: foreach ($lunches as $item): ?>
-<div class="item"><div class="food"><?= htmlspecialchars($item['food_item']) ?></div><div class="meta">📅 <?= htmlspecialchars(displayDate($item['lunch_date'])) ?> · 🕐 <?= htmlspecialchars($item['meal_type'] ?? 'Lunch') ?> · <?= htmlspecialchars($item['meal_time'] ?? '') ?></div><?php if ($item['quantity']): ?><div class="quantity">Quantity: <?= htmlspecialchars($item['quantity']) ?></div><?php endif; ?><?php if ($item['notes']): ?><div class="notes"><?= htmlspecialchars($item['notes']) ?></div><?php endif; ?></div>
-<?php endforeach; endif; ?></div>
-
-<div class="card"><h2>Reports & History</h2><div class="nav"><a href="reports.php">📊 Reports</a><a href="export.php">⬇️ Export</a></div></div>
-</div>
-<div id="mealAlertBanner" class="alert-banner"></div>
-<script src="assets/meal-alert.js"></script>
-<script>
-function isoFromDisplay(value) {
-    const m = value.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);
-    if (!m) return null;
-    const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
-    const date = new Date(Date.UTC(y, mo - 1, d));
-    if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
-    return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-}
-
-document.getElementById('foodForm').addEventListener('submit', function(e) {
-    const iso = isoFromDisplay(document.getElementById('date_display').value);
-    if (!iso) {
-        e.preventDefault();
-        alert('Please enter a valid date in DD-MM-YYYY format.');
-        return;
-    }
-    document.getElementById('lunch_date').value = iso;
-});
-</script>
-</body></html>
+:root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#687386;--line:#e5e9f0;--primary:#172554;--blue:#2563eb;--soft:#eff6ff;--shadow:0 10px 30px rgba(15,23,42,.07)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}.container{width:min(100% - 28px,980px);margin:auto;padding:22px 0 40px}.hero{background:linear-gradient(135deg,#172554,#1d4ed8);color:#fff;border-radius:24px;padding:26px;box-shadow:0 16px 38px rgba(30,64,175,.22);position:relative;overflow:hidden}.hero:after{content:"";position:absolute;width:190px;height:190px;border-radius:50%;right:-70px;top:-75px;background:rgba(255,255,255,.08)}.hero-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start;position:relative;z-index:1}.eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;opacity:.72;font-weight:800}.hero h1{font-size:30px;margin:6px 0}.hero p{margin:0;color:#dbeafe}.today{background:rgba(255,255,255,.12);padding:10px 13px;border-radius:12px;text-align:right;font-weight:700;white-space:nowrap}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:16px 0}.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}.stat strong{display:block;font-size:25px}.stat span{color:var(--muted);font-size:13px}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px}.section-head h2{margin:0;font-size:19px}.section-head small{color:var(--muted)}.schedule{display:grid;grid-template-columns:repeat(2,1fr);gap:11px}.meal{border:1px solid var(--line);border-radius:15px;padding:14px;display:flex;gap:12px;align-items:flex-start;background:#fbfcfe;transition:.2s}.meal:hover{transform:translateY(-1px);box-shadow:0 8px 20px rgba(15,23,42,.06)}.meal-icon{width:42px;height:42px;border-radius:12px;background:var(--soft);display:grid;place-items:center;font-size:21px;flex:none}.meal-info{min-width:0}.meal-name{font-weight:800;margin-bottom:3px}.meal-time{font-size:12px;color:var(--blue);font-weight:800}.meal-food{font-size:13px;color:var(--muted);margin-top:5px;line-height:1.4}.actions{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.action{display:block;text-decoration:none;text-align:center;border-radius:13px;padding:13px;font-weight:800;border:1px solid var(--line);color:var(--text);background:#fff}.action.primary{background:var(--primary);color:#fff;border-color:var(--primary)}label{display:block;font-size:13px;font-weight:800;margin:15px 0 7px}input,textarea,select,button{width:100%;font:inherit;border-radius:12px;padding:13px 14px}input,textarea,select{border:1px solid #d7dce5;background:#fff;color:var(--text);outline:none}input:focus,textarea:focus,select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.10)}textarea{min-height:85px;resize:vertical}button{border:0;background:var(--primary);color:#fff;font-weight:800;cursor:pointer;margin-top:16px}.notify{background:#eef2ff;color:#1e3a8a;border:1px solid #dbeafe;margin-top:10px}.date-help{color:var(--muted);font-size:12px;margin-top:6px}.entries{display:grid;gap:10px}.entry{border:1px solid var(--line);border-radius:15px;padding:15px;background:#fff}.entry-top{display:flex;justify-content:space-between;gap:12px}.food{font-weight:800;font-size:16px}.meal-badge{font-size:11px;background:#eff6ff;color:#1d4ed8;padding:6px 9px;border-radius:999px;font-weight:800;white-space:nowrap}.meta{color:var(--muted);font-size:12px;margin-top:7px}.quantity{margin-top:7px;font-size:13px}.notes{margin-top:7px;color:#475569;font-size:13px}.empty{text-align:center;color:var(--muted);padding:25px 10px}.alert-banner{position:fixed;left:14px;right:14px;bottom:16px;max-width:600px;margin:auto;background:#111827;color:#fff;padding:16px 18px;border-radius:16px;box-shadow:0 14px 35px rgba(0,0,0,.28);transform:translateY(150%);transition:.3s;z-index:50}.alert-banner.show{transform:translateY(0)}.footer{text-align:center;color:var(--muted);font-size:12px;margin-top:20px}@media(max-width:650px){.container{width:min(100% - 20px,980px);padding-top:12px}.hero{padding:20px;border-radius:20px}.hero h1{font-size:25px}.today{font-size:12px}.stats{gap:8px}.stat{padding:13px}.stat strong{font-size:21px}.schedule,.actions{grid-template-columns:1fr}.card{padding:16px}}
+</style></head><body><div class="container">
+<header class="hero"><div class="hero-top"><div><div class="eyebrow">Personal nutrition tracker</div><h1>🍽️ Food Log</h1><p>Plan your meals, record what you eat and review your history.</p></div><div class="today">Today<br><?=htmlspecialchars(displayDate($today))?></div></div></header>
+<div class="stats"><div class="stat"><strong><?=$totalToday?></strong><span>Entries today</span></div><div class="stat"><strong><?=$daysLogged?></strong><span>Days logged</span></div><div class="stat"><strong><?=$totalAll?></strong><span>Total entries</span></div></div>
+<div class="card"><div class="section-head"><h2>⏰ Daily Food Timetable</h2><small>Meal reminders</small></div><div class="schedule"><?php foreach($schedule as $meal): ?><div class="meal"><div class="meal-icon"><?=$meal[4]?></div><div class="meal-info"><div class="meal-name"><?=htmlspecialchars($meal[2])?></div><div class="meal-time"><?=date('h:i A',strtotime($meal[0]))?> – <?=date('h:i A',strtotime($meal[1]))?></div><div class="meal-food"><?=htmlspecialchars($meal[3])?></div></div></div><?php endforeach;?></div><button type="button" class="notify" onclick="requestMealNotifications();alert('Notification permission requested. Keep this page open for scheduled reminders.');">🔔 Enable Meal Notifications</button></div>
+<div class="card"><div class="section-head"><h2>➕ Add Food Entry</h2><small>DD-MM-YYYY</small></div><form method="post" action="save.php" id="foodForm"><label for="date_display">Date</label><input type="text" id="date_display" value="<?=htmlspecialchars(displayDate($today))?>" placeholder="DD-MM-YYYY" inputmode="numeric" maxlength="10" autocomplete="off" required><input type="hidden" name="lunch_date" id="lunch_date" value="<?=htmlspecialchars($today)?>"><div class="date-help">Enter date as DD-MM-YYYY. Example: 26-08-2026</div><label for="meal_type">Meal</label><select name="meal_type" id="meal_type" required><?php foreach($schedule as $meal): ?><option value="<?=htmlspecialchars($meal[2])?>" <?=$meal[2]==='Lunch'?'selected':''?>><?=htmlspecialchars($meal[4].' '.$meal[2].' — '.date('h:i A',strtotime($meal[0])).'–'.date('h:i A',strtotime($meal[1])))?></option><?php endforeach;?></select><label for="food_item">Food Item</label><input type="text" id="food_item" name="food_item" placeholder="e.g. Rice + Fish Curry" required><label for="quantity">Quantity</label><input type="text" id="quantity" name="quantity" placeholder="e.g. 1 plate"><label for="notes">Notes</label><textarea id="notes" name="notes" placeholder="Optional notes"></textarea><button type="submit">Save Food Entry</button></form></div>
+<div class="card"><div class="section-head"><h2>Today's Entries</h2><small><?=htmlspecialchars(displayDate($today))?></small></div><?php if(!$lunches):?><div class="empty">No food entries recorded today.</div><?php else:?><div class="entries"><?php foreach($lunches as $item):?><div class="entry"><div class="entry-top"><div class="food"><?=htmlspecialchars($item['food_item'])?></div><div class="meal-badge"><?=htmlspecialchars($item['meal_type']??'Lunch')?></div></div><div class="meta">📅 <?=htmlspecialchars(displayDate($item['lunch_date']))?> · ⏰ <?=htmlspecialchars($item['meal_time']??'')?> · Recorded <?=htmlspecialchars(displayTime($item['recorded_time']??''))?></div><?php if($item['quantity']):?><div class="quantity"><strong>Quantity:</strong> <?=htmlspecialchars($item['quantity'])?></div><?php endif;?><?php if($item['notes']):?><div class="notes">📝 <?=htmlspecialchars($item['notes'])?></div><?php endif;?></div><?php endforeach;?></div><?php endif;?></div>
+<div class="card"><div class="section-head"><h2>Quick Access</h2></div><div class="actions"><a class="action primary" href="reports.php">📊 Reports</a><a class="action" href="export.php">⬇️ Export</a><a class="action" href="reports.php?report=monthly">📅 Monthly</a></div></div><div class="footer">Food Log · Date format DD-MM-YYYY</div></div><div id="mealAlertBanner" class="alert-banner"></div>
+<script src="assets/meal-alert.js"></script><script>function isoFromDisplay(v){const m=v.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);if(!m)return null;const d=+m[1],mo=+m[2],y=+m[3],x=new Date(Date.UTC(y,mo-1,d));if(x.getUTCFullYear()!=y||x.getUTCMonth()!=mo-1||x.getUTCDate()!=d)return null;return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;}document.getElementById('foodForm').addEventListener('submit',function(e){const iso=isoFromDisplay(document.getElementById('date_display').value);if(!iso){e.preventDefault();alert('Please enter a valid date in DD-MM-YYYY format.');return;}document.getElementById('lunch_date').value=iso;});</script></body></html>
