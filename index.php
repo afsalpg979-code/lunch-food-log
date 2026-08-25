@@ -52,9 +52,9 @@ function displayDate(string $iso): string {
 <h2>Add Food Entry</h2>
 <form method="post" action="save.php" id="foodForm">
 <label>Date</label>
-<input type="text" id="date_display" value="<?= htmlspecialchars(displayDate($today)) ?>" placeholder="DD-MM-YYYY" inputmode="numeric" maxlength="10" required>
+<input type="text" id="date_display" value="<?= htmlspecialchars(displayDate($today)) ?>" placeholder="DD-MM-YYYY" inputmode="numeric" maxlength="10" autocomplete="off" required>
 <input type="hidden" name="lunch_date" id="lunch_date" value="<?= htmlspecialchars($today) ?>">
-<div class="date-help">Format: DD-MM-YYYY (example: 26-08-2026)</div>
+<div class="date-help">Enter date as DD-MM-YYYY, for example: 26-08-2026</div>
 <label>Meal Time</label>
 <select name="meal_type" required>
 <option value="Breakfast">08:00–09:00 AM — Breakfast</option>
