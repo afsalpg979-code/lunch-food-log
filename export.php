@@ -4,6 +4,12 @@ require __DIR__ . '/database.php';
 $format = $_GET['format'] ?? 'csv';
 $start = $_GET['start'] ?? '';
 $end = $_GET['end'] ?? '';
+
+function displayDate(string $iso): string {
+    $time = strtotime($iso);
+    return $time ? date('d-m-Y', $time) : $iso;
+}
+
 if (!$start || !$end) exit('Invalid date range.');
 
 $stmt = $db->prepare(
@@ -14,13 +20,16 @@ $stmt = $db->prepare(
 $stmt->execute([$start, $end]);
 $rows = $stmt->fetchAll();
 
+$displayStart = displayDate($start);
+$displayEnd = displayDate($end);
+
 if ($format === 'xlsx') {
     header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
     header('Content-Disposition: attachment; filename="food_report_'.$start.'_to_'.$end.'.xls"');
     echo "\xEF\xBB\xBF";
     echo "Date\tMeal\tTime\tRecorded Time\tFood Item\tQuantity\tNotes\n";
     foreach ($rows as $row) {
-        $values = [$row['lunch_date'], $row['meal_type'], $row['meal_time'], $row['recorded_time'], $row['food_item'], $row['quantity'], $row['notes']];
+        $values = [displayDate($row['lunch_date']), $row['meal_type'], $row['meal_time'], $row['recorded_time'], $row['food_item'], $row['quantity'], $row['notes']];
         echo implode("\t", array_map(fn($v) => str_replace(["\t","\n","\r"], ' ', (string)$v), $values)) . "\n";
     }
     exit;
@@ -32,7 +41,7 @@ $output = fopen('php://output', 'w');
 fprintf($output, "\xEF\xBB\xBF");
 fputcsv($output, ['Date','Meal','Meal Time','Recorded Time','Food Item','Quantity','Notes']);
 foreach ($rows as $row) {
-    fputcsv($output, [$row['lunch_date'],$row['meal_type'],$row['meal_time'],$row['recorded_time'],$row['food_item'],$row['quantity'],$row['notes']]);
+    fputcsv($output, [displayDate($row['lunch_date']),$row['meal_type'],$row['meal_time'],$row['recorded_time'],$row['food_item'],$row['quantity'],$row['notes']]);
 }
 fclose($output);
 exit;
