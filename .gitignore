@@ -1,0 +1,16 @@
+# Local SQLite database (do not commit personal food records)
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+
+# Local/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary/export files
+*.tmp
+*.log
+*.xls
+*.xlsx
