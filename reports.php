@@ -1,15 +1,87 @@
 <?php
 require __DIR__ . '/database.php';
-$report=$_GET['report']??'';$year=(int)($_GET['year']??date('Y'));$month=(int)($_GET['month']??date('n'));$start=$end='';
-function displayDate(string $iso):string{$t=strtotime($iso);return $t?date('d-m-Y',$t):$iso;}
-function validIsoDate(string $v):bool{$d=DateTime::createFromFormat('Y-m-d',$v);return $d&&$d->format('Y-m-d')===$v;}
-if($report==='monthly'){$start=sprintf('%04d-%02d-01',$year,$month);$end=date('Y-m-t',strtotime($start));}elseif($report==='six_months'){$end=date('Y-m-d');$start=date('Y-m-d',strtotime('-5 months',strtotime(date('Y-m-01'))));}elseif($report==='yearly'){$start="$year-01-01";$end="$year-12-31";}elseif($report==='custom'){$start=$_GET['start']??'';$end=$_GET['end']??'';if(!validIsoDate($start)||!validIsoDate($end)||$start>$end)$start=$end='';}
-$rows=[];if($start&&$end){$stmt=$db->prepare('SELECT lunch_date,meal_type,meal_time,recorded_time,food_item,quantity,notes FROM lunches WHERE lunch_date BETWEEN ? AND ? ORDER BY lunch_date ASC,meal_time ASC,id ASC');$stmt->execute([$start,$end]);$rows=$stmt->fetchAll();}$total=count($rows);$mealCounts=[];foreach($rows as $r){$mealCounts[$r['meal_type']??'Lunch']=($mealCounts[$r['meal_type']??'Lunch']??0)+1;}
+
+$report = $_GET['report'] ?? '';
+$year = (int)($_GET['year'] ?? date('Y'));
+$month = (int)($_GET['month'] ?? date('n'));
+$start = $end = '';
+
+function displayDate(string $iso): string {
+    $time = strtotime($iso);
+    return $time ? date('d-m-Y', $time) : $iso;
+}
+
+function validIsoDate(string $value): bool {
+    $date = DateTime::createFromFormat('Y-m-d', $value);
+    if (!$date) return false;
+    $errors = DateTime::getLastErrors();
+    return (!$errors || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
+        && $date->format('Y-m-d') === $value;
+}
+
+if ($report === 'monthly' && $year >= 2000 && $year <= 2100 && $month >= 1 && $month <= 12) {
+    $start = sprintf('%04d-%02d-01', $year, $month);
+    $end = date('Y-m-t', strtotime($start));
+} elseif ($report === 'six_months') {
+    $end = date('Y-m-d');
+    $start = date('Y-m-d', strtotime('-5 months', strtotime(date('Y-m-01'))));
+} elseif ($report === 'yearly' && $year >= 2000 && $year <= 2100) {
+    $start = "$year-01-01";
+    $end = "$year-12-31";
+} elseif ($report === 'custom') {
+    $start = $_GET['start'] ?? '';
+    $end = $_GET['end'] ?? '';
+    if (!validIsoDate($start) || !validIsoDate($end) || $start > $end) {
+        $start = $end = '';
+    }
+}
+
+$rows = [];
+if ($start && $end) {
+    $stmt = $db->prepare(
+        'SELECT id, lunch_date, meal_type, meal_time, recorded_time, food_item, quantity, notes
+         FROM lunches WHERE lunch_date BETWEEN ? AND ?
+         ORDER BY lunch_date ASC, meal_time ASC, id ASC'
+    );
+    $stmt->execute([$start, $end]);
+    $rows = $stmt->fetchAll();
+}
+
+$total = count($rows);
+$mealCounts = [];
+foreach ($rows as $row) {
+    $name = $row['meal_type'] ?? 'Lunch';
+    $mealCounts[$name] = ($mealCounts[$name] ?? 0) + 1;
+}
 ?>
-<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#172554"><title>Food Reports</title><style>
-:root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#687386;--line:#e5e9f0;--primary:#172554;--blue:#2563eb;--soft:#eff6ff;--shadow:0 10px 30px rgba(15,23,42,.07)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}.container{width:min(100% - 28px,1100px);margin:auto;padding:22px 0 40px}.top{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:16px}.back{text-decoration:none;color:var(--primary);font-weight:800}.title{background:linear-gradient(135deg,#172554,#1d4ed8);color:#fff;border-radius:22px;padding:23px 25px;margin-bottom:16px;box-shadow:0 14px 34px rgba(30,64,175,.18)}.title h1{margin:0 0 5px;font-size:27px}.title p{margin:0;color:#dbeafe}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.filters{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 14px}label{display:block;font-size:13px;font-weight:800;margin:13px 0 7px}input,select,button{width:100%;font:inherit;border-radius:12px;padding:12px 13px}input,select{border:1px solid #d7dce5;background:#fff;color:var(--text)}button{border:0;background:var(--primary);color:#fff;font-weight:800;margin-top:16px;cursor:pointer}.help{font-size:12px;color:var(--muted);margin-top:6px}.summary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.metric{border:1px solid var(--line);border-radius:15px;padding:14px;background:#fbfcfe}.metric strong{font-size:24px;display:block}.metric span{font-size:12px;color:var(--muted)}.period{font-size:13px;color:var(--muted);margin:14px 0 0}.download{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.download a{display:block;text-align:center;text-decoration:none;background:var(--primary);color:#fff;padding:12px;border-radius:12px;font-weight:800}.download a.alt{background:#eef2ff;color:#1e3a8a}.meal-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.pill{padding:7px 10px;border-radius:999px;background:var(--soft);color:#1d4ed8;font-size:12px;font-weight:800}h2{margin:0 0 14px;font-size:19px}table{width:100%;border-collapse:separate;border-spacing:0;min-width:760px}th,td{padding:12px 11px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#64748b}tr:last-child td{border-bottom:0}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}.empty{text-align:center;color:var(--muted);padding:30px}.custom-only{display:none}.footer{text-align:center;color:var(--muted);font-size:12px;margin-top:20px}@media(max-width:760px){.container{width:min(100% - 20px,1100px);padding-top:12px}.grid{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.title{padding:20px}.title h1{font-size:24px}.download{grid-template-columns:1fr}}
-</style></head><body><div class="container"><div class="top"><a class="back" href="index.php">← Dashboard</a><span style="color:#687386;font-size:12px">Food Log</span></div><div class="title"><h1>📊 Food Reports</h1><p>Review meals by month, six months, year or a custom date range.</p></div>
-<div class="grid"><div class="card"><h2>Report Filters</h2><form method="get" id="reportForm"><div class="filters"><div><label>Report Type</label><select name="report" id="report" onchange="toggleFields(this.value)" required><option value="">Select Report</option><option value="monthly" <?=$report==='monthly'?'selected':''?>>Monthly Report</option><option value="six_months" <?=$report==='six_months'?'selected':''?>>Last 6 Months</option><option value="yearly" <?=$report==='yearly'?'selected':''?>>Yearly Report</option><option value="custom" <?=$report==='custom'?'selected':''?>>Custom Date Range</option></select></div><div id="monthYear"><label>Month</label><select name="month"><?php for($m=1;$m<=12;$m++):?><option value="<?=$m?>" <?=$month===$m?'selected':''?>><?=date('F',mktime(0,0,0,$m,1))?></option><?php endfor;?></select><label>Year</label><input type="number" name="year" value="<?=$year?>" min="2000" max="2100"></div></div><div id="customDates" class="custom-only"><label>Start Date</label><input type="text" id="start_display" value="<?=$start?htmlspecialchars(displayDate($start)):''?>" placeholder="DD-MM-YYYY" inputmode="numeric" maxlength="10"><input type="hidden" name="start" id="start" value="<?=htmlspecialchars($start)?>"><label>End Date</label><input type="text" id="end_display" value="<?=$end?htmlspecialchars(displayDate($end)):''?>" placeholder="DD-MM-YYYY" inputmode="numeric" maxlength="10"><input type="hidden" name="end" id="end" value="<?=htmlspecialchars($end)?>"><div class="help">Format: DD-MM-YYYY · Example: 01-08-2026</div></div><button type="submit">Generate Report</button></form></div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#172554">
+<title>Food Reports</title>
+<style>
+:root{--bg:#f5f7fb;--card:#fff;--text:#172033;--muted:#687386;--line:#e5e9f0;--primary:#172554;--blue:#2563eb;--soft:#eff6ff;--shadow:0 10px 30px rgba(15,23,42,.07)}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",Arial,sans-serif}.container{width:min(100% - 28px,1100px);margin:auto;padding:22px 0 40px}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}.back{text-decoration:none;color:var(--primary);font-weight:800}.title{background:linear-gradient(135deg,#172554,#1d4ed8);color:#fff;border-radius:22px;padding:23px 25px;margin-bottom:16px;box-shadow:0 14px 34px rgba(30,64,175,.18)}.title h1{margin:0 0 5px;font-size:27px}.title p{margin:0;color:#dbeafe}.card{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.filters{display:grid;grid-template-columns:repeat(2,1fr);gap:4px 14px}label{display:block;font-size:13px;font-weight:800;margin:13px 0 7px}input,select,button{width:100%;font:inherit;border-radius:12px;padding:12px 13px}input,select{border:1px solid #d7dce5;background:#fff;color:var(--text)}button{border:0;background:var(--primary);color:#fff;font-weight:800;margin-top:16px;cursor:pointer}.help{font-size:12px;color:var(--muted);margin-top:6px}.summary{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.metric{border:1px solid var(--line);border-radius:15px;padding:14px;background:#fbfcfe}.metric strong{font-size:24px;display:block}.metric span{font-size:12px;color:var(--muted)}.period{font-size:13px;color:var(--muted);margin:14px 0 0}.meal-stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}.pill{padding:7px 10px;border-radius:999px;background:var(--soft);color:#1d4ed8;font-size:12px;font-weight:800}.download{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}.download a{display:block;text-align:center;text-decoration:none;background:var(--primary);color:#fff;padding:12px;border-radius:12px;font-weight:800}.download a.alt{background:#eef2ff;color:#1e3a8a}h2{margin:0 0 14px;font-size:19px}table{width:100%;border-collapse:separate;border-spacing:0;min-width:760px}th,td{padding:12px 11px;border-bottom:1px solid var(--line);text-align:left;font-size:13px}th{background:#f8fafc;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#64748b}.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:14px}.empty{text-align:center;color:var(--muted);padding:30px}.custom-only{display:none}.footer{text-align:center;color:var(--muted);font-size:12px;margin-top:20px}@media(max-width:760px){.container{width:min(100% - 20px,1100px);padding-top:12px}.grid{grid-template-columns:1fr}.filters{grid-template-columns:1fr}.title{padding:20px}.title h1{font-size:24px}.download{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="container">
+<div class="top"><a class="back" href="index.php">← Dashboard</a><span style="color:#687386;font-size:12px">Food Log</span></div>
+<div class="title"><h1>📊 Food Reports</h1><p>Review meals by month, six months, year or a custom date range.</p></div>
+<div class="grid">
+<div class="card"><h2>Report Filters</h2>
+<form method="get" id="reportForm">
+<div class="filters"><div><label>Report Type</label><select name="report" id="report" onchange="toggleFields(this.value)" required><option value="">Select Report</option><option value="monthly" <?=$report==='monthly'?'selected':''?>>Monthly Report</option><option value="six_months" <?=$report==='six_months'?'selected':''?>>Last 6 Months</option><option value="yearly" <?=$report==='yearly'?'selected':''?>>Yearly Report</option><option value="custom" <?=$report==='custom'?'selected':''?>>Custom Date Range</option></select></div>
+<div id="monthYear"><label>Month</label><select name="month"><?php for($m=1;$m<=12;$m++):?><option value="<?=$m?>" <?=$month===$m?'selected':''?>><?=date('F',mktime(0,0,0,$m,1))?></option><?php endfor;?></select><label>Year</label><input type="number" name="year" value="<?=$year?>" min="2000" max="2100"></div></div>
+<div id="customDates" class="custom-only"><label>Start Date</label><input type="text" id="start_display" value="<?=$start?htmlspecialchars(displayDate($start)):''?>" placeholder="DD-MM-YYYY" inputmode="numeric" maxlength="10"><input type="hidden" name="start" id="start" value="<?=htmlspecialchars($start)?>"><label>End Date</label><input type="text" id="end_display" value="<?=$end?htmlspecialchars(displayDate($end)):''?>" placeholder="DD-MM-YYYY" inputmode="numeric" maxlength="10"><input type="hidden" name="end" id="end" value="<?=htmlspecialchars($end)?>"><div class="help">Format: DD-MM-YYYY · Example: 01-08-2026</div></div>
+<button type="submit">Generate Report</button></form></div>
 <div class="card"><h2>Summary</h2><?php if($report&&$start&&$end):?><div class="summary"><div class="metric"><strong><?=$total?></strong><span>Total food entries</span></div><div class="metric"><strong><?=count(array_unique(array_column($rows,'lunch_date')))?></strong><span>Days with entries</span></div></div><p class="period"><strong>Period:</strong> <?=htmlspecialchars(displayDate($start))?> → <?=htmlspecialchars(displayDate($end))?></p><div class="meal-stats"><?php foreach($mealCounts as $name=>$count):?><span class="pill"><?=htmlspecialchars($name)?>: <?=$count?></span><?php endforeach;?></div><div class="download"><a href="export.php?format=xlsx&start=<?=urlencode($start)?>&end=<?=urlencode($end)?>">⬇️ Excel</a><a class="alt" href="export.php?format=csv&start=<?=urlencode($start)?>&end=<?=urlencode($end)?>">⬇️ CSV</a></div><?php else:?><div class="empty">Choose a report type to view your food history.</div><?php endif;?></div></div>
-<?php if($report&&$start&&$end):?><div class="card"><h2>Report Preview</h2><?php if(!$rows):?><div class="empty">No food entries found for this period.</div><?php else:?><div class="table-wrap"><table><thead><tr><th>Date</th><th>Meal</th><th>Meal Time</th><th>Food Item</th><th>Quantity</th><th>Recorded</th><th>Notes</th></tr></thead><tbody><?php foreach($rows as $row):?><tr><td><?=htmlspecialchars(displayDate($row['lunch_date']))?></td><td><?=htmlspecialchars($row['meal_type']??'Lunch')?></td><td><?=htmlspecialchars($row['meal_time']??'')?></td><td><strong><?=htmlspecialchars($row['food_item'])?></strong></td><td><?=htmlspecialchars($row['quantity']??'')?></td><td><?=htmlspecialchars($row['recorded_time']??'')?></td><td><?=htmlspecialchars($row['notes']??'')?></td></tr><?php endforeach;?></tbody></table></div><?php endif;?></div><?php endif;?><div class="footer">Food Log · Dates displayed as DD-MM-YYYY</div></div>
-<script>function toggleFields(v){document.getElementById('monthYear').style.display=(v==='monthly'||v==='yearly')?'block':'none';document.getElementById('customDates').style.display=v==='custom'?'block':'none';}function iso(v){const m=v.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);if(!m)return null;const d=+m[1],mo=+m[2],y=+m[3],x=new Date(Date.UTC(y,mo-1,d));return x.getUTCFullYear()===y&&x.getUTCMonth()===mo-1&&x.getUTCDate()===d?`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`:null;}document.getElementById('reportForm').addEventListener('submit',function(e){if(document.getElementById('report').value==='custom'){const s=iso(document.getElementById('start_display').value),en=iso(document.getElementById('end_display').value);if(!s||!en||s>en){e.preventDefault();alert('Please enter valid dates in DD-MM-YYYY format.');return;}document.getElementById('start').value=s;document.getElementById('end').value=en;}});toggleFields(<?=json_encode($report)?>);</script></body></html>
+<?php if($report&&$start&&$end):?><div class="card"><h2>Report Preview</h2><?php if(!$rows):?><div class="empty">No food entries found for this period.</div><?php else:?><div class="table-wrap"><table><thead><tr><th>Date</th><th>Meal</th><th>Meal Time</th><th>Food Item</th><th>Quantity</th><th>Recorded</th><th>Notes</th></tr></thead><tbody><?php foreach($rows as $row):?><tr><td><?=htmlspecialchars(displayDate($row['lunch_date']))?></td><td><?=htmlspecialchars($row['meal_type']??'Lunch')?></td><td><?=htmlspecialchars($row['meal_time']??'')?></td><td><strong><?=htmlspecialchars($row['food_item'])?></strong></td><td><?=htmlspecialchars($row['quantity']??'')?></td><td><?=htmlspecialchars($row['recorded_time']??'')?></td><td><?=htmlspecialchars($row['notes']??'')?></td></tr><?php endforeach;?></tbody></table></div><?php endif;?></div><?php endif;?>
+<div class="footer">Food Log · Dates displayed as DD-MM-YYYY</div></div>
+<script>
+function toggleFields(v){document.getElementById('monthYear').style.display=(v==='monthly'||v==='yearly')?'block':'none';document.getElementById('customDates').style.display=v==='custom'?'block':'none';}
+function iso(v){const m=v.trim().match(/^(\d{2})-(\d{2})-(\d{4})$/);if(!m)return null;const d=+m[1],mo=+m[2],y=+m[3],x=new Date(Date.UTC(y,mo-1,d));return x.getUTCFullYear()===y&&x.getUTCMonth()===mo-1&&x.getUTCDate()===d?`${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`:null;}
+document.getElementById('reportForm').addEventListener('submit',function(e){if(document.getElementById('report').value==='custom'){const s=iso(document.getElementById('start_display').value),en=iso(document.getElementById('end_display').value);if(!s||!en||s>en){e.preventDefault();alert('Please enter valid dates in DD-MM-YYYY format.');return;}document.getElementById('start').value=s;document.getElementById('end').value=en;}});toggleFields(<?=json_encode($report)?>);
+</script>
+</body></html>
