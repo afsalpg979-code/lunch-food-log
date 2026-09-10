@@ -14,7 +14,18 @@ function cleanCell($value): string {
     return str_replace(["\t", "\n", "\r"], ' ', trim((string)$value));
 }
 
-if (!$start || !$end) exit('Invalid date range.');
+function validIsoDate(string $value): bool {
+    $date = DateTime::createFromFormat('Y-m-d', $value);
+    if (!$date) return false;
+    $errors = DateTime::getLastErrors();
+    return (!$errors || ($errors['warning_count'] === 0 && $errors['error_count'] === 0))
+        && $date->format('Y-m-d') === $value;
+}
+
+if (!validIsoDate($start) || !validIsoDate($end) || $start > $end) {
+    http_response_code(400);
+    exit('Invalid date range.');
+}
 
 $stmt = $db->prepare(
     'SELECT lunch_date, meal_type, meal_time, recorded_time, food_item, quantity, notes
@@ -26,47 +37,37 @@ $rows = $stmt->fetchAll();
 
 $displayStart = displayDate($start);
 $displayEnd = displayDate($end);
+$filenameBase = 'food_report_' . $displayStart . '_to_' . $displayEnd;
 
 if ($format === 'xlsx') {
+    // This is Excel-compatible tab-separated output, intentionally saved as .xls.
     header('Content-Type: application/vnd.ms-excel; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="food_report_'.$displayStart.'_to_'.$displayEnd.'.xls"');
+    header('Content-Disposition: attachment; filename="' . $filenameBase . '.xls"');
     echo "\xEF\xBB\xBF";
     echo "Food Log Report\n";
     echo "Period\t" . cleanCell($displayStart) . " to " . cleanCell($displayEnd) . "\n\n";
     echo "Date\tMeal\tMeal Time\tRecorded Time\tFood Item\tQuantity\tNotes\n";
-
     foreach ($rows as $row) {
-        $values = [
-            displayDate($row['lunch_date']),
-            $row['meal_type'],
-            $row['meal_time'],
-            $row['recorded_time'],
-            $row['food_item'],
-            $row['quantity'],
-            $row['notes']
-        ];
-        echo implode("\t", array_map('cleanCell', $values)) . "\n";
+        echo implode("\t", array_map('cleanCell', [
+            displayDate($row['lunch_date']), $row['meal_type'], $row['meal_time'],
+            $row['recorded_time'], $row['food_item'], $row['quantity'], $row['notes']
+        ])) . "\n";
     }
     exit;
 }
 
+if ($format !== 'csv') {
+    http_response_code(400);
+    exit('Unsupported export format.');
+}
+
 header('Content-Type: text/csv; charset=UTF-8');
-header('Content-Disposition: attachment; filename="food_report_'.$displayStart.'_to_'.$displayEnd.'.csv"');
+header('Content-Disposition: attachment; filename="' . $filenameBase . '.csv"');
 $output = fopen('php://output', 'w');
 fprintf($output, "\xEF\xBB\xBF");
 fputcsv($output, ['Date','Meal','Meal Time','Recorded Time','Food Item','Quantity','Notes']);
-
 foreach ($rows as $row) {
-    fputcsv($output, [
-        displayDate($row['lunch_date']),
-        $row['meal_type'],
-        $row['meal_time'],
-        $row['recorded_time'],
-        $row['food_item'],
-        $row['quantity'],
-        $row['notes']
-    ]);
+    fputcsv($output, [displayDate($row['lunch_date']), $row['meal_type'], $row['meal_time'], $row['recorded_time'], $row['food_item'], $row['quantity'], $row['notes']]);
 }
-
 fclose($output);
 exit;
