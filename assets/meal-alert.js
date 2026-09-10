@@ -8,28 +8,27 @@
         { start: '22:15', end: '22:45', name: 'Dinner' }
     ];
 
-    const pad = n => String(n).padStart(2, '0');
-    const todayKey = () => new Date().toISOString().slice(0, 10);
-
-    function minutesNow() {
+    const todayKey = () => {
         const now = new Date();
-        return now.getHours() * 60 + now.getMinutes();
-    }
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    };
 
-    function toMinutes(value) {
+    const toMinutes = value => {
         const [h, m] = value.split(':').map(Number);
         return h * 60 + m;
-    }
+    };
 
     function currentMeal() {
-        const current = minutesNow();
+        const now = new Date();
+        const current = now.getHours() * 60 + now.getMinutes();
         return schedule.find(meal => current >= toMinutes(meal.start) && current <= toMinutes(meal.end));
     }
 
     function requestPermission() {
         if ('Notification' in window && Notification.permission === 'default') {
-            Notification.requestPermission().catch(() => {});
+            return Notification.requestPermission().catch(() => 'denied');
         }
+        return Promise.resolve(Notification?.permission || 'denied');
     }
 
     function showReminder(meal) {
@@ -39,11 +38,9 @@
         const message = `It's time for ${meal.name}. Don't forget to record your food.`;
         const banner = document.getElementById('mealAlertBanner');
         if (banner) {
-            banner.innerHTML = `<strong>🔔 ${meal.name}</strong><br>${message}`;
+            banner.textContent = `🔔 ${meal.name}: ${message}`;
             banner.classList.add('show');
-            setTimeout(() => banner.classList.remove('show'), 12000);
-        } else {
-            alert(`🔔 ${meal.name}\n\n${message}`);
+            window.setTimeout(() => banner.classList.remove('show'), 12000);
         }
 
         if ('Notification' in window && Notification.permission === 'granted') {
@@ -51,6 +48,7 @@
                 new Notification(`🍽️ ${meal.name} Reminder`, { body: message });
             } catch (_) {}
         }
+
         localStorage.setItem(key, '1');
     }
 
@@ -63,7 +61,8 @@
     window.requestMealNotifications = requestPermission;
     window.checkMealSchedule = checkSchedule;
 
+    // Notifications are browser-based and work while the dashboard is active.
     requestPermission();
     checkSchedule();
-    setInterval(checkSchedule, 60000);
+    window.setInterval(checkSchedule, 60000);
 })();
