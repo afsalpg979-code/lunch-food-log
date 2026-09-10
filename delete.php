@@ -1,5 +1,4 @@
 <?php
-session_start();
 require __DIR__ . '/database.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -8,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit('Method not allowed.');
 }
 
+verifyCsrf();
 $id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 if (!$id) {
     http_response_code(400);
