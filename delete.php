@@ -1,7 +1,14 @@
 <?php
+session_start();
 require __DIR__ . '/database.php';
 
-$id = filter_input(INPUT_GET, 'id', FILTER_VALIDATE_INT);
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    header('Allow: POST');
+    exit('Method not allowed.');
+}
+
+$id = filter_input(INPUT_POST, 'id', FILTER_VALIDATE_INT);
 if (!$id) {
     http_response_code(400);
     exit('Invalid entry ID.');
