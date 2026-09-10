@@ -1,5 +1,6 @@
 <?php
 require __DIR__ . '/database.php';
+verifyCsrf();
 
 $date = trim($_POST['lunch_date'] ?? '');
 $food = trim($_POST['food_item'] ?? '');
@@ -20,6 +21,11 @@ $parsed = DateTime::createFromFormat('Y-m-d', $date);
 if (!$parsed || $parsed->format('Y-m-d') !== $date || $food === '') {
     http_response_code(400);
     exit('Please enter a valid date and food item.');
+}
+
+if (mb_strlen($food) > 150 || mb_strlen($quantity) > 80 || mb_strlen($notes) > 250) {
+    http_response_code(400);
+    exit('One or more fields are too long.');
 }
 
 if (!isset($allowedMeals[$mealType])) {
