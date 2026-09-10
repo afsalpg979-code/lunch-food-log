@@ -8,9 +8,10 @@ A lightweight, mobile-friendly PHP + SQLite food logging dashboard for localhost
 - 🍳 Breakfast, morning snack, lunch, evening snack, duty meal and dinner timetable
 - 🔔 Optional meal reminders while the dashboard is open
 - 📊 Monthly, last-6-months, yearly and custom-range reports
-- 🔎 Food history with report preview
+- ✏️ Edit existing food entries
+- 🗑️ POST-based deletion of entries
+- 🔎 Report preview with meal, quantity, time and notes
 - ⬇️ CSV and Excel-compatible export
-- 🗑️ Secure POST-based entry deletion
 - 📱 Responsive mobile and desktop design
 - 💾 SQLite — no external database server required
 - 🔒 Prepared SQL statements and server-side validation
@@ -25,11 +26,14 @@ lunch-food-log/
 │   └── lunch.sqlite
 ├── database.php
 ├── delete.php
+├── edit.php
 ├── export.php
 ├── index.php
 ├── reports.php
 ├── save.php
-└── php-termux.ini
+├── update.php
+├── php-termux.ini
+└── .gitignore
 ```
 
 ## ▶️ Run with Termux
@@ -66,15 +70,17 @@ Open **Reports** and choose:
 
 Custom dates use DD-MM-YYYY in the interface.
 
-## 🔐 Security
+## 🔐 Security notes
 
-Database writes use prepared statements and displayed values are escaped. Destructive actions should use POST requests and CSRF protection. If deployed publicly, keep the SQLite database outside the web root or deny direct access to the `data/` directory.
+Database writes use prepared statements and displayed values are escaped. Delete and update actions now require POST requests. For public hosting, keep the SQLite database outside the web root or configure the web server to deny direct access to the `data/` directory.
+
+The `.gitignore` prevents newly created local SQLite database files and temporary exports from being committed. Existing personal database history already tracked by Git should be removed from version control before public deployment if it contains private records.
 
 ## 🚀 Recommended next improvements
 
-- Edit existing entries
-- Search/filter history directly from the dashboard
+- Dashboard search/filter controls
 - Dashboard charts and nutrition statistics
-- PWA/offline support
+- Real `.xlsx` workbook export using a spreadsheet library
+- PWA/offline support and reliable background reminders
 - Backup and restore
 - Optional user accounts for multi-user hosting
