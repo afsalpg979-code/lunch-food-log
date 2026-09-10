@@ -9,7 +9,7 @@ A lightweight, mobile-friendly PHP + SQLite food logging dashboard for localhost
 - 🔔 Optional meal reminders while the dashboard is open
 - 📊 Monthly, last-6-months, yearly and custom-range reports
 - ✏️ Edit existing food entries
-- 🗑️ POST-based deletion of entries
+- 🗑️ CSRF-protected deletion from the dashboard
 - 🔎 Report preview with meal, quantity, time and notes
 - ⬇️ CSV and Excel-compatible export
 - 📱 Responsive mobile and desktop design
@@ -72,7 +72,7 @@ Custom dates use DD-MM-YYYY in the interface.
 
 ## 🔐 Security notes
 
-Database writes use prepared statements and displayed values are escaped. Delete and update actions now require POST requests. For public hosting, keep the SQLite database outside the web root or configure the web server to deny direct access to the `data/` directory.
+Database writes use prepared statements and displayed values are escaped. Save and update actions validate CSRF tokens and server-side input lengths. Delete actions require a valid session CSRF token before removing an entry. For public hosting, keep the SQLite database outside the web root or configure the web server to deny direct access to the `data/` directory.
 
 The `.gitignore` prevents newly created local SQLite database files and temporary exports from being committed. Existing personal database history already tracked by Git should be removed from version control before public deployment if it contains private records.
 
