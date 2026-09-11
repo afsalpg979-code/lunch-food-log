@@ -11,7 +11,7 @@ A lightweight, mobile-friendly PHP + SQLite food logging dashboard for localhost
 - ✏️ Edit existing food entries
 - 🗑️ CSRF-protected deletion from the dashboard
 - 🔎 Report preview with meal, quantity, time and notes
-- ⬇️ CSV and Excel-compatible export
+- ⬇️ CSV export and **real `.xlsx` Excel workbook export**
 - 📱 Responsive mobile and desktop design
 - 💾 SQLite — no external database server required
 - 🔒 Prepared SQL statements and server-side validation
@@ -70,6 +70,10 @@ Open **Reports** and choose:
 
 Custom dates use DD-MM-YYYY in the interface.
 
+### Excel export
+
+The Excel download is now a **real `.xlsx` workbook**, not a tab-separated file renamed as `.xls`. It can be opened by Microsoft Excel and compatible mobile Office apps. The export is generated directly by PHP without requiring Composer, PhpSpreadsheet, or the PHP Zip extension.
+
 ## 🔐 Security notes
 
 Database writes use prepared statements and displayed values are escaped. Save and update actions validate CSRF tokens and server-side input lengths. Delete actions require a valid session CSRF token before removing an entry. For public hosting, keep the SQLite database outside the web root or configure the web server to deny direct access to the `data/` directory.
@@ -80,7 +84,6 @@ The `.gitignore` prevents newly created local SQLite database files and temporar
 
 - Dashboard search/filter controls
 - Dashboard charts and nutrition statistics
-- Real `.xlsx` workbook export using a spreadsheet library
 - PWA/offline support and reliable background reminders
 - Backup and restore
 - Optional user accounts for multi-user hosting
