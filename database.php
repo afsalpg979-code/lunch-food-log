@@ -72,13 +72,6 @@ function verifyCsrf(): void {
     }
 }
 
-function requireLogin(): void {
-    if (empty($_SESSION['user_id'])) {
-        header('Location: login.php');
-        exit;
-    }
-}
-
 function h(?string $value): string {
     return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
 }
