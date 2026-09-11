@@ -7,193 +7,29 @@
         { start: '20:00', end: '21:00', name: 'During Duty' },
         { start: '22:15', end: '22:45', name: 'Dinner' }
     ];
-
     const pad = n => String(n).padStart(2, '0');
-    const todayKey = () => {
-        const now = new Date();
-        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
-    };
-    const toMinutes = value => {
-        const [h, m] = value.split(':').map(Number);
-        return h * 60 + m;
-    };
-
-    let audioContext = null;
-    let serviceWorkerRegistration = null;
-    let alarmTimer = null;
-
-    function currentMeal() {
-        const now = new Date();
-        const current = now.getHours() * 60 + now.getMinutes();
-        return schedule.find(meal => current >= toMinutes(meal.start) && current <= toMinutes(meal.end));
+    const todayKey = () => { const now = new Date(); return `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`; };
+    const toMinutes = value => { const [h,m] = value.split(':').map(Number); return h*60+m; };
+    let audioContext = null, serviceWorkerRegistration = null, alarmTimer = null;
+    function currentMeal(){const now=new Date(),current=now.getHours()*60+now.getMinutes();return schedule.find(meal=>current>=toMinutes(meal.start)&&current<=toMinutes(meal.end));}
+    function requestPermission(){if(!('Notification'in window))return Promise.resolve('unsupported');if(Notification.permission==='default')return Notification.requestPermission().catch(()=> 'denied');return Promise.resolve(Notification.permission);}
+    function enableAlarm(){try{const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return false;audioContext=audioContext||new AudioCtx();if(audioContext.state==='suspended')audioContext.resume();localStorage.setItem('meal-alarm-enabled','1');return true;}catch(_){return false;}}
+    function playAlarm(){if(localStorage.getItem('meal-alarm-enabled')!=='1')return;try{const AudioCtx=window.AudioContext||window.webkitAudioContext;if(!AudioCtx)return;audioContext=audioContext||new AudioCtx();if(audioContext.state==='suspended')audioContext.resume();const start=audioContext.currentTime;for(let i=0;i<6;i++){const oscillator=audioContext.createOscillator(),gain=audioContext.createGain();oscillator.type='sine';oscillator.frequency.value=i%2?880:660;const at=start+i*.3;gain.gain.setValueAtTime(.0001,at);gain.gain.exponentialRampToValueAtTime(.22,at+.03);gain.gain.exponentialRampToValueAtTime(.0001,at+.24);oscillator.connect(gain).connect(audioContext.destination);oscillator.start(at);oscillator.stop(at+.26);}}catch(_) {}}
+    function notificationKey(meal){return `meal-reminder-${todayKey()}-${meal.name}`;}
+    function showReminder(meal){const key=notificationKey(meal);if(localStorage.getItem(key))return;const message=`It's time for ${meal.name}. Don't forget to record your food.`;const banner=document.getElementById('mealAlertBanner');if(banner){banner.textContent=`🔔 ${meal.name}: ${message}`;banner.classList.add('show');window.setTimeout(()=>banner.classList.remove('show'),12000);}playAlarm();if(navigator.vibrate)navigator.vibrate([300,150,300,150,500]);if(serviceWorkerRegistration&&Notification.permission==='granted')serviceWorkerRegistration.active?.postMessage({type:'SHOW_MEAL_NOTIFICATION',meal:meal.name});else if('Notification'in window&&Notification.permission==='granted'){try{new Notification(`🍽️ ${meal.name} Reminder`,{body:message,tag:`meal-${meal.name}`,renotify:true});}catch(_) {}}localStorage.setItem(key,'1');}
+    function checkSchedule(){const meal=currentMeal();if(meal)showReminder(meal);}
+    function nextAlarmDate(){const now=new Date();for(const meal of schedule){const[h,m]=meal.start.split(':').map(Number),target=new Date(now);target.setHours(h,m,0,0);if(target>now)return{meal,target};}const[h,m]=schedule[0].start.split(':').map(Number),target=new Date(now);target.setDate(target.getDate()+1);target.setHours(h,m,0,0);return{meal:schedule[0],target};}
+    function scheduleNextAlarm(){if(alarmTimer)clearTimeout(alarmTimer);if(localStorage.getItem('meal-reminders-enabled')!=='1')return;const next=nextAlarmDate(),delay=Math.max(1000,next.target.getTime()-Date.now());alarmTimer=setTimeout(()=>{showReminder(next.meal);scheduleNextAlarm();},delay);}
+    function injectPwaLink(){if(!document.querySelector('link[rel="manifest"]')){const link=document.createElement('link');link.rel='manifest';link.href='manifest.json';document.head.appendChild(link);}if(!document.querySelector('meta[name="mobile-web-app-capable"]')){const meta=document.createElement('meta');meta.name='mobile-web-app-capable';meta.content='yes';document.head.appendChild(meta);}}
+    function addInstallButton(){let deferredPrompt=null;window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();deferredPrompt=event;if(document.getElementById('pwaInstallButton'))return;const button=document.createElement('button');button.id='pwaInstallButton';button.type='button';button.textContent='📲 Install Food Log App';button.style.cssText='position:fixed;right:14px;bottom:76px;z-index:49;border:0;border-radius:999px;padding:12px 16px;background:#2563eb;color:#fff;font:800 13px system-ui;box-shadow:0 10px 25px rgba(0,0,0,.2);cursor:pointer';button.onclick=async()=>{if(!deferredPrompt)return;deferredPrompt.prompt();await deferredPrompt.userChoice;deferredPrompt=null;button.remove();};document.body.appendChild(button);});}
+    function addDashboardUX(){
+        if(!document.querySelector('link[data-app-css]')){const link=document.createElement('link');link.rel='stylesheet';link.href='assets/app.css';link.dataset.appCss='1';document.head.appendChild(link);}
+        const entries=document.querySelector('.entries');
+        if(entries&&entries.children.length){const box=document.createElement('div');box.className='search';box.innerHTML='<input type="search" id="foodSearch" placeholder="🔎 Search today\'s food..." aria-label="Search today\'s food">';entries.parentElement.insertBefore(box,entries);const input=box.querySelector('input');input.addEventListener('input',()=>{const q=input.value.trim().toLowerCase();[...entries.children].forEach(card=>{card.style.display=card.textContent.toLowerCase().includes(q)?'':'none';});});}
+        if(!document.querySelector('.mobile-nav')){const nav=document.createElement('nav');nav.className='mobile-nav';nav.innerHTML='<a href="index.php">🏠<br>Home</a><a href="reports.php">📊<br>Reports</a><a href="profile.php">👤<br>Profile</a>';document.body.appendChild(nav);}
     }
-
-    function requestPermission() {
-        if (!('Notification' in window)) return Promise.resolve('unsupported');
-        if (Notification.permission === 'default') {
-            return Notification.requestPermission().catch(() => 'denied');
-        }
-        return Promise.resolve(Notification.permission);
-    }
-
-    function enableAlarm() {
-        try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return false;
-            audioContext = audioContext || new AudioCtx();
-            if (audioContext.state === 'suspended') audioContext.resume();
-            localStorage.setItem('meal-alarm-enabled', '1');
-            return true;
-        } catch (_) { return false; }
-    }
-
-    function playAlarm() {
-        if (localStorage.getItem('meal-alarm-enabled') !== '1') return;
-        try {
-            const AudioCtx = window.AudioContext || window.webkitAudioContext;
-            if (!AudioCtx) return;
-            audioContext = audioContext || new AudioCtx();
-            if (audioContext.state === 'suspended') audioContext.resume();
-            const start = audioContext.currentTime;
-            for (let i = 0; i < 6; i++) {
-                const oscillator = audioContext.createOscillator();
-                const gain = audioContext.createGain();
-                oscillator.type = 'sine';
-                oscillator.frequency.value = i % 2 ? 880 : 660;
-                const at = start + i * 0.3;
-                gain.gain.setValueAtTime(0.0001, at);
-                gain.gain.exponentialRampToValueAtTime(0.22, at + 0.03);
-                gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.24);
-                oscillator.connect(gain).connect(audioContext.destination);
-                oscillator.start(at);
-                oscillator.stop(at + 0.26);
-            }
-        } catch (_) {}
-    }
-
-    function notificationKey(meal) { return `meal-reminder-${todayKey()}-${meal.name}`; }
-
-    function showReminder(meal) {
-        const key = notificationKey(meal);
-        if (localStorage.getItem(key)) return;
-        const message = `It's time for ${meal.name}. Don't forget to record your food.`;
-        const banner = document.getElementById('mealAlertBanner');
-        if (banner) {
-            banner.textContent = `🔔 ${meal.name}: ${message}`;
-            banner.classList.add('show');
-            window.setTimeout(() => banner.classList.remove('show'), 12000);
-        }
-        playAlarm();
-        if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 500]);
-
-        if (serviceWorkerRegistration && Notification.permission === 'granted') {
-            serviceWorkerRegistration.active?.postMessage({ type: 'SHOW_MEAL_NOTIFICATION', meal: meal.name });
-        } else if ('Notification' in window && Notification.permission === 'granted') {
-            try { new Notification(`🍽️ ${meal.name} Reminder`, { body: message, tag: `meal-${meal.name}`, renotify: true }); } catch (_) {}
-        }
-        localStorage.setItem(key, '1');
-    }
-
-    function checkSchedule() {
-        const meal = currentMeal();
-        if (meal) showReminder(meal);
-    }
-
-    function nextAlarmDate() {
-        const now = new Date();
-        for (const meal of schedule) {
-            const [h, m] = meal.start.split(':').map(Number);
-            const target = new Date(now);
-            target.setHours(h, m, 0, 0);
-            if (target > now) return { meal, target };
-        }
-        const [h, m] = schedule[0].start.split(':').map(Number);
-        const target = new Date(now);
-        target.setDate(target.getDate() + 1);
-        target.setHours(h, m, 0, 0);
-        return { meal: schedule[0], target };
-    }
-
-    function scheduleNextAlarm() {
-        if (alarmTimer) clearTimeout(alarmTimer);
-        if (localStorage.getItem('meal-reminders-enabled') !== '1') return;
-        const next = nextAlarmDate();
-        const delay = Math.max(1000, next.target.getTime() - Date.now());
-        alarmTimer = setTimeout(() => {
-            showReminder(next.meal);
-            scheduleNextAlarm();
-        }, delay);
-    }
-
-    function injectPwaLink() {
-        if (!document.querySelector('link[rel="manifest"]')) {
-            const link = document.createElement('link');
-            link.rel = 'manifest';
-            link.href = 'manifest.json';
-            document.head.appendChild(link);
-        }
-        if (!document.querySelector('meta[name="mobile-web-app-capable"]')) {
-            const meta = document.createElement('meta');
-            meta.name = 'mobile-web-app-capable';
-            meta.content = 'yes';
-            document.head.appendChild(meta);
-        }
-    }
-
-    function addInstallButton() {
-        let deferredPrompt = null;
-        window.addEventListener('beforeinstallprompt', event => {
-            event.preventDefault();
-            deferredPrompt = event;
-            if (document.getElementById('pwaInstallButton')) return;
-            const button = document.createElement('button');
-            button.id = 'pwaInstallButton';
-            button.type = 'button';
-            button.textContent = '📲 Install Food Log App';
-            button.style.cssText = 'position:fixed;right:14px;bottom:76px;z-index:49;border:0;border-radius:999px;padding:12px 16px;background:#2563eb;color:#fff;font:800 13px system-ui;box-shadow:0 10px 25px rgba(0,0,0,.2);cursor:pointer';
-            button.onclick = async () => {
-                if (!deferredPrompt) return;
-                deferredPrompt.prompt();
-                await deferredPrompt.userChoice;
-                deferredPrompt = null;
-                button.remove();
-            };
-            document.body.appendChild(button);
-        });
-    }
-
-    async function registerPwa() {
-        injectPwaLink();
-        addInstallButton();
-        if (!('serviceWorker' in navigator)) return;
-        try {
-            serviceWorkerRegistration = await navigator.serviceWorker.register('sw.js', { scope: './' });
-        } catch (_) {}
-    }
-
-    async function enableMealReminders() {
-        enableAlarm();
-        const permission = await requestPermission();
-        if (permission !== 'granted' && permission !== 'unsupported') {
-            alert('Please allow notifications in your browser/site settings.');
-        }
-        localStorage.setItem('meal-reminders-enabled', '1');
-        localStorage.setItem('meal-alarm-enabled', '1');
-        const button = document.getElementById('mealNotifyButton');
-        if (button) button.textContent = '🔔 Meal Notifications + Alarm Enabled';
-        checkSchedule();
-        scheduleNextAlarm();
-    }
-
-    window.mealSchedule = schedule;
-    window.requestMealNotifications = requestPermission;
-    window.enableMealReminders = enableMealReminders;
-    window.enableMealAlarm = enableAlarm;
-    window.checkMealSchedule = checkSchedule;
-
-    registerPwa();
-    checkSchedule();
-    if (localStorage.getItem('meal-reminders-enabled') === '1') scheduleNextAlarm();
-    window.setInterval(checkSchedule, 15000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { checkSchedule(); scheduleNextAlarm(); } });
+    async function registerPwa(){injectPwaLink();addInstallButton();if(!('serviceWorker'in navigator))return;try{serviceWorkerRegistration=await navigator.serviceWorker.register('sw.js',{scope:'./'});}catch(_) {}}
+    async function enableMealReminders(){enableAlarm();const permission=await requestPermission();if(permission!=='granted'&&permission!=='unsupported')alert('Please allow notifications in your browser/site settings.');localStorage.setItem('meal-reminders-enabled','1');localStorage.setItem('meal-alarm-enabled','1');const button=document.getElementById('mealNotifyButton');if(button)button.textContent='🔔 Meal Notifications + Alarm Enabled';checkSchedule();scheduleNextAlarm();}
+    window.mealSchedule=schedule;window.requestMealNotifications=requestPermission;window.enableMealReminders=enableMealReminders;window.enableMealAlarm=enableAlarm;window.checkMealSchedule=checkSchedule;
+    registerPwa();addDashboardUX();checkSchedule();if(localStorage.getItem('meal-reminders-enabled')==='1')scheduleNextAlarm();window.setInterval(checkSchedule,15000);document.addEventListener('visibilitychange',()=>{if(!document.hidden){checkSchedule();scheduleNextAlarm();}});
 })();
