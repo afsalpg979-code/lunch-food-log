@@ -1,5 +1,19 @@
 <?php
-if (session_status() !== PHP_SESSION_ACTIVE) session_start();
+// Keep application timestamps aligned with the user's local timezone.
+date_default_timezone_set('Asia/Kolkata');
+
+// Harden the session before it is started.
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    $secure = !empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off';
+    session_set_cookie_params([
+        'lifetime' => 0,
+        'path' => '/',
+        'secure' => $secure,
+        'httponly' => true,
+        'samesite' => 'Lax'
+    ]);
+    session_start();
+}
 
 $dataDir = __DIR__ . '/data';
 if (!is_dir($dataDir) && !mkdir($dataDir, 0775, true)) {
@@ -11,6 +25,7 @@ $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 $db->setAttribute(PDO::ATTR_DEFAULT_FETCH_MODE, PDO::FETCH_ASSOC);
 $db->exec('PRAGMA foreign_keys = ON');
 $db->exec('PRAGMA busy_timeout = 5000');
+$db->exec('PRAGMA journal_mode = WAL');
 
 $db->exec("CREATE TABLE IF NOT EXISTS users (
  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,7 +56,6 @@ if (!in_array('meal_type', $names, true)) $db->exec("ALTER TABLE lunches ADD COL
 if (!in_array('meal_time', $names, true)) $db->exec("ALTER TABLE lunches ADD COLUMN meal_time TEXT DEFAULT '12:00-13:00'");
 if (!in_array('recorded_time', $names, true)) $db->exec('ALTER TABLE lunches ADD COLUMN recorded_time TEXT');
 
-// Indexes keep the dashboard and date-range reports fast as the log grows.
 $db->exec('CREATE INDEX IF NOT EXISTS idx_lunches_user_date ON lunches(user_id, lunch_date)');
 $db->exec('CREATE INDEX IF NOT EXISTS idx_lunches_user_meal ON lunches(user_id, meal_time, id)');
 
