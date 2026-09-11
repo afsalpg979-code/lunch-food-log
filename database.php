@@ -2,7 +2,9 @@
 if (session_status() !== PHP_SESSION_ACTIVE) session_start();
 
 $dataDir = __DIR__ . '/data';
-if (!is_dir($dataDir) && !mkdir($dataDir, 0775, true)) throw new RuntimeException('Unable to create data directory.');
+if (!is_dir($dataDir) && !mkdir($dataDir, 0775, true)) {
+    throw new RuntimeException('Unable to create data directory.');
+}
 
 $db = new PDO('sqlite:' . $dataDir . '/lunch.sqlite');
 $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -39,15 +41,30 @@ if (!in_array('meal_type', $names, true)) $db->exec("ALTER TABLE lunches ADD COL
 if (!in_array('meal_time', $names, true)) $db->exec("ALTER TABLE lunches ADD COLUMN meal_time TEXT DEFAULT '12:00-13:00'");
 if (!in_array('recorded_time', $names, true)) $db->exec('ALTER TABLE lunches ADD COLUMN recorded_time TEXT');
 
+// Indexes keep the dashboard and date-range reports fast as the log grows.
+$db->exec('CREATE INDEX IF NOT EXISTS idx_lunches_user_date ON lunches(user_id, lunch_date)');
+$db->exec('CREATE INDEX IF NOT EXISTS idx_lunches_user_meal ON lunches(user_id, meal_time, id)');
+
 function csrfToken(): string {
     if (empty($_SESSION['csrf_token'])) $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
     return $_SESSION['csrf_token'];
 }
+
 function verifyCsrf(): void {
     $token = $_POST['csrf_token'] ?? '';
-    if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) { http_response_code(403); exit('Invalid security token.'); }
+    if (!$token || !hash_equals($_SESSION['csrf_token'] ?? '', $token)) {
+        http_response_code(403);
+        exit('Invalid security token.');
+    }
 }
+
 function requireLogin(): void {
-    if (empty($_SESSION['user_id'])) { header('Location: login.php'); exit; }
+    if (empty($_SESSION['user_id'])) {
+        header('Location: login.php');
+        exit;
+    }
 }
-function h(?string $value): string { return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8'); }
+
+function h(?string $value): string {
+    return htmlspecialchars((string)$value, ENT_QUOTES, 'UTF-8');
+}
