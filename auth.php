@@ -27,3 +27,11 @@ function loginUser(int $id): void {
     session_regenerate_id(true);
     $_SESSION['user_id'] = $id;
 }
+function requireLogin(): void {
+    $user = currentUser();
+    if (!$user) {
+        unset($_SESSION['user_id']);
+        header('Location: login.php');
+        exit;
+    }
+}
