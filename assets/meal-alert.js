@@ -8,9 +8,10 @@
         { start: '22:15', end: '22:45', name: 'Dinner' }
     ];
 
+    const pad = n => String(n).padStart(2, '0');
     const todayKey = () => {
         const now = new Date();
-        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
     };
 
     const toMinutes = value => {
@@ -25,10 +26,50 @@
     }
 
     function requestPermission() {
-        if ('Notification' in window && Notification.permission === 'default') {
+        if (!('Notification' in window)) return Promise.resolve('unsupported');
+        if (Notification.permission === 'default') {
             return Notification.requestPermission().catch(() => 'denied');
         }
-        return Promise.resolve(Notification?.permission || 'denied');
+        return Promise.resolve(Notification.permission);
+    }
+
+    let audioContext = null;
+
+    function enableAlarm() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return false;
+            audioContext = audioContext || new AudioCtx();
+            if (audioContext.state === 'suspended') audioContext.resume();
+            localStorage.setItem('meal-alarm-enabled', '1');
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function playAlarm() {
+        if (localStorage.getItem('meal-alarm-enabled') !== '1') return;
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            audioContext = audioContext || new AudioCtx();
+            if (audioContext.state === 'suspended') audioContext.resume();
+
+            const start = audioContext.currentTime;
+            for (let i = 0; i < 4; i++) {
+                const oscillator = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                oscillator.type = 'sine';
+                oscillator.frequency.value = i % 2 ? 880 : 660;
+                gain.gain.setValueAtTime(0.0001, start + i * 0.35);
+                gain.gain.exponentialRampToValueAtTime(0.22, start + i * 0.35 + 0.03);
+                gain.gain.exponentialRampToValueAtTime(0.0001, start + i * 0.35 + 0.28);
+                oscillator.connect(gain).connect(audioContext.destination);
+                oscillator.start(start + i * 0.35);
+                oscillator.stop(start + i * 0.35 + 0.3);
+            }
+        } catch (_) {}
     }
 
     function showReminder(meal) {
@@ -43,9 +84,15 @@
             window.setTimeout(() => banner.classList.remove('show'), 12000);
         }
 
+        playAlarm();
+
         if ('Notification' in window && Notification.permission === 'granted') {
             try {
-                new Notification(`🍽️ ${meal.name} Reminder`, { body: message });
+                new Notification(`🍽️ ${meal.name} Reminder`, {
+                    body: message,
+                    tag: `meal-${meal.name}`,
+                    renotify: true
+                });
             } catch (_) {}
         }
 
@@ -57,12 +104,21 @@
         if (meal) showReminder(meal);
     }
 
+    async function enableMealReminders() {
+        enableAlarm();
+        await requestPermission();
+        localStorage.setItem('meal-reminders-enabled', '1');
+        checkSchedule();
+        const button = document.getElementById('mealNotifyButton');
+        if (button) button.textContent = '🔔 Meal Notifications + Alarm Enabled';
+    }
+
     window.mealSchedule = schedule;
     window.requestMealNotifications = requestPermission;
+    window.enableMealReminders = enableMealReminders;
+    window.enableMealAlarm = enableAlarm;
     window.checkMealSchedule = checkSchedule;
 
-    // Notifications are browser-based and work while the dashboard is active.
-    requestPermission();
     checkSchedule();
-    window.setInterval(checkSchedule, 60000);
+    window.setInterval(checkSchedule, 15000);
 })();
