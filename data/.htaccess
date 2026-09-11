@@ -1,0 +1,4 @@
+# Protect the SQLite database and its journal files when using Apache.
+<FilesMatch "\.(sqlite|sqlite-shm|sqlite-wal)$">
+    Require all denied
+</FilesMatch>
