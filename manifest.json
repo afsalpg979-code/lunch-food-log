@@ -1,0 +1,16 @@
+{
+  "name": "Lunch Food Log",
+  "short_name": "Food Log",
+  "description": "Personal meal tracker with scheduled food reminders.",
+  "start_url": "./index.php",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#f4f7fb",
+  "theme_color": "#0f172a",
+  "lang": "en-IN",
+  "categories": ["health", "food", "lifestyle"],
+  "icons": [
+    { "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
