@@ -1,30 +1,38 @@
 # 🍽️ Lunch Food Log
 
-A lightweight, mobile-friendly PHP + SQLite food logging dashboard for localhost, XAMPP, Termux, or a small PHP server.
+A secure, mobile-first PHP + SQLite personal food logging PWA for localhost, XAMPP, Termux, or a small PHP server.
 
-## ✨ Features
+## 🚀 Current upgraded features
 
-- 🔐 User signup and login system
-- 🤖 CAPTCHA security check on signup and login
-- 👤 User profile management and password change
-- 🔒 Each account can access only its own food records and reports
-- 📅 DD-MM-YYYY date display and entry format
-- 🍳 Breakfast, morning snack, lunch, evening snack, duty meal and dinner timetable
-- 🔔 Scheduled meal notifications + browser alarm + vibration
-- 📲 Installable Android-style PWA
+- 🔐 Secure signup/login with arithmetic CAPTCHA
+- 🛡️ CSRF protection on state-changing actions
+- ⏱️ 4-hour inactive-session timeout + session ID regeneration on login
+- 👤 Professional profile page with profile-photo upload/remove and password change
+- 🔒 Per-user food records and reports
+- 📅 DD-MM-YYYY date entry/display throughout the UI
+- 🍳 Six meal windows: Breakfast, Morning Snack, Lunch, Evening Snack, During Duty and Dinner
+- 📈 Dashboard meal-completion progress (0–100%)
+- 🔎 Instant search for today's food entries
+- ✏️ Edit and 🗑️ secure delete of food records
+- 🔔 Meal notifications, alarm sound, vibration and PWA notification support
+- 📲 Installable Android-style PWA with service worker/offline shell
 - 📊 Monthly, last-6-months, yearly and custom-range reports
-- ✏️ Edit existing food entries
-- 🗑️ CSRF-protected deletion
-- ⬇️ CSV and real `.xlsx` Excel workbook export
-- 📱 Responsive mobile and desktop design
-- 💾 SQLite — no external database server required
+- 👀 Report preview before export
+- ⬇️ CSV and real `.xlsx` Excel export
+- 📱 Responsive mobile + desktop interface with mobile bottom navigation
+- 💾 SQLite with WAL mode, indexes and no external database server
+- 🧹 Local database, export files and uploaded profile photos are protected by `.gitignore`
 
 ## 📁 Project structure
 
 ```text
 lunch-food-log/
-├── assets/meal-alert.js
-├── data/lunch.sqlite
+├── assets/
+│   ├── app.css
+│   ├── icon.svg
+│   └── meal-alert.js
+├── data/lunch.sqlite          # local only; ignored by Git
+├── uploads/                   # profile photos; ignored by Git
 ├── auth.php
 ├── database.php
 ├── login.php
@@ -35,6 +43,7 @@ lunch-food-log/
 ├── edit.php
 ├── update.php
 ├── delete.php
+├── save.php
 ├── reports.php
 ├── export.php
 ├── manifest.json
@@ -50,39 +59,37 @@ cd ~/lunch-food-log
 php -d opcache.enable=0 -d opcache.enable_cli=0 -d opcache.file_cache="" -S 127.0.0.1:8081 -t .
 ```
 
-Open Chrome and visit:
+Open Chrome:
 
 ```text
 http://127.0.0.1:8081
 ```
 
-You will be redirected to **Login**. New users can choose **Create account**, complete the CAPTCHA, and then start using the dashboard.
+## 🔐 Security
 
-## 🔐 Account security
+Passwords use PHP `password_hash()` / `password_verify()`. Food queries are restricted to the logged-in user's `user_id`. State-changing requests use CSRF tokens. Successful login regenerates the session ID, and inactive sessions expire after four hours. User profile photos are stored with randomized filenames and validated as JPG, PNG or WebP images.
 
-Passwords are stored with PHP `password_hash()` and checked with `password_verify()`. Login/signup use a simple server-generated arithmetic CAPTCHA, CSRF tokens protect state-changing actions, sessions are regenerated on successful login, and food queries are restricted to the logged-in user's `user_id`.
+For public hosting, keep the SQLite database outside the web root or explicitly deny direct access to `data/` and user-upload directories.
 
-When the first account is created on an existing installation, legacy food rows that do not yet have a user owner are assigned to that first account so existing data is not lost.
+## ⏰ Default meal schedule
 
-For public hosting, keep the SQLite database outside the web root or deny direct access to `data/`.
+| Time | Meal |
+|---|---|
+| 08:00 | Breakfast |
+| 10:30 | Morning Snack |
+| 12:00 | Lunch |
+| 16:30 | Evening Snack |
+| 20:00 | During Duty |
+| 22:15 | Dinner |
 
-## ⏰ Meal schedule
+## 🗓️ Date handling
 
-- 08:00 — Breakfast
-- 10:30 — Morning Snack
-- 12:00 — Lunch
-- 16:30 — Evening Snack
-- 20:00 — During Duty
-- 22:15 — Dinner
+The interface accepts and displays **DD-MM-YYYY**. SQLite stores dates as **YYYY-MM-DD** for reliable sorting and reporting.
 
-## 🗓️ Date format
+## 📊 Reports & exports
 
-The UI uses **DD-MM-YYYY**. SQLite stores dates internally as **YYYY-MM-DD** for reliable sorting and reports.
-
-## 📊 Reports
-
-Open **Reports** and choose Monthly, Last 6 Months, Yearly, or Custom Date Range. Custom dates use DD-MM-YYYY in the interface. Exports contain only the current user's records.
+Use **Reports** for Monthly, Last 6 Months, Yearly or Custom Range. Custom ranges also use DD-MM-YYYY. CSV and `.xlsx` exports contain only the current user's records.
 
 ## 📲 Notifications
 
-Meal reminders work while the dashboard/PWA is running or resumed. Android/browser battery saving or force-stop can suspend JavaScript timers, so a normal web app cannot guarantee alarms after complete termination. Guaranteed background alarms require a native Android implementation using Android AlarmManager/WorkManager.
+The PWA can show meal reminders, play an alarm and vibrate on supported devices. Browser/JavaScript timers can be suspended by Android battery optimization or force-stop, so guaranteed alarms after complete app termination require a native Android AlarmManager/WorkManager implementation.
