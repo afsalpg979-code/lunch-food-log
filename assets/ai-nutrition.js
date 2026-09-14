@@ -2,7 +2,7 @@
   'use strict';
   const food = document.querySelector('input[name="food_item"]');
   const form = document.getElementById('foodForm');
-  if (!food || !form) return;
+  if (!food || !form || document.querySelector('.ai-nutrition-card')) return;
 
   const q = document.querySelector('input[name="quantity"]');
   const fields = {
@@ -15,18 +15,21 @@
   const card = document.createElement('div');
   card.className = 'ai-nutrition-card';
   card.innerHTML = `
-    <div class="ai-title">🤖 AI Nutrition</div>
-    <p class="ai-help">Describe your meal or scan a food photo. AI will estimate food, quantity, calories, protein, carbs and fat.</p>
+    <div class="ai-title">🤖 AI Food Scanner</div>
+    <p class="ai-help">Take a meal photo, upload one from your gallery, or describe the food. AI estimates the food, quantity and nutrition values.</p>
     <div class="ai-buttons">
-      <button type="button" class="ai-btn" id="aiAnalyzeText">✨ Analyze Food with AI</button>
-      <label class="ai-btn ai-scan" for="aiFoodImage">📷 Scan Food</label>
-      <input id="aiFoodImage" type="file" accept="image/*" capture="environment" hidden>
+      <button type="button" class="ai-btn" id="aiAnalyzeText">✨ Analyze Food</button>
+      <label class="ai-btn ai-scan" for="aiCameraInput">📷 Open Camera</label>
+      <label class="ai-btn ai-upload" for="aiGalleryInput">🖼️ Upload Photo</label>
+      <input id="aiCameraInput" type="file" accept="image/*" capture="environment" hidden>
+      <input id="aiGalleryInput" type="file" accept="image/*" hidden>
     </div>
     <div id="aiStatus" class="ai-status" aria-live="polite"></div>`;
   form.insertBefore(card, form.querySelector('.grid'));
 
   const status = document.getElementById('aiStatus');
-  const image = document.getElementById('aiFoodImage');
+  const camera = document.getElementById('aiCameraInput');
+  const gallery = document.getElementById('aiGalleryInput');
   const analyze = document.getElementById('aiAnalyzeText');
 
   function setStatus(text, bad = false) {
@@ -40,7 +43,7 @@
     if (text) fd.append('food_text', text);
     if (q && q.value.trim()) fd.append('quantity', q.value.trim());
     if (file) fd.append('food_image', file);
-    setStatus('⏳ AI is analyzing your meal…');
+    setStatus('⏳ Analyzing your meal photo…');
     analyze.disabled = true;
     try {
       const r = await fetch('ai_nutrition.php', { method:'POST', body:fd, credentials:'same-origin' });
@@ -54,15 +57,22 @@
       if (fields.carbs) fields.carbs.value = x.carbs ?? '';
       if (fields.fat) fields.fat.value = x.fat ?? '';
       const conf = Number(x.confidence || 0);
-      setStatus(`✓ AI detected: ${x.food_item || 'meal'} · ${x.calories || 0} kcal · ${x.protein || 0}g protein · confidence ${conf}%${x.notes ? ' · '+x.notes : ''}`);
+      setStatus(`✓ Detected: ${x.food_item || 'meal'} · ${x.calories || 0} kcal · ${x.protein || 0}g protein · confidence ${conf}%${x.notes ? ' · '+x.notes : ''}`);
     } catch (e) {
       setStatus('⚠️ ' + e.message, true);
-    } finally { analyze.disabled = false; }
+    } finally {
+      analyze.disabled = false;
+    }
   }
 
   analyze.addEventListener('click', () => {
-    if (!food.value.trim()) { setStatus('Enter the food details first.', true); food.focus(); return; }
+    if (!food.value.trim()) {
+      setStatus('Enter food details first, then tap Analyze Food.', true);
+      food.focus();
+      return;
+    }
     callAI(null);
   });
-  image.addEventListener('change', () => { if (image.files && image.files[0]) callAI(image.files[0]); });
+  camera.addEventListener('change', () => { if (camera.files && camera.files[0]) callAI(camera.files[0]); });
+  gallery.addEventListener('change', () => { if (gallery.files && gallery.files[0]) callAI(gallery.files[0]); });
 })();
