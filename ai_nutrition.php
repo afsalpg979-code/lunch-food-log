@@ -17,7 +17,7 @@ if ($image && $image['error'] === UPLOAD_ERR_OK) {
     if ((int)$image['size'] > 8 * 1024 * 1024) { http_response_code(400); echo json_encode(['ok'=>false,'error'=>'Food image must be 8 MB or smaller.']); exit; }
     $content[] = ['type'=>'input_image','image_url'=>'data:'.$mime.';base64,'.base64_encode((string)file_get_contents($image['tmp_name']))];
 }
-$model = getenv('OPENAI_FOOD_MODEL') ?: 'gpt-4.1-mini';
+$model = getenv('OPENAI_FOOD_MODEL') ?: 'gpt-5.6-luna';
 $payload = ['model'=>$model,'input'=>[['role'=>'user','content'=>$content]],'max_output_tokens'=>500];
 $ch = curl_init('https://api.openai.com/v1/responses');
 curl_setopt_array($ch,[CURLOPT_POST=>true,CURLOPT_RETURNTRANSFER=>true,CURLOPT_HTTPHEADER=>['Content-Type: application/json','Authorization: Bearer '.$apiKey],CURLOPT_POSTFIELDS=>json_encode($payload,JSON_UNESCAPED_SLASHES),CURLOPT_TIMEOUT=>60]);
