@@ -9,7 +9,7 @@ function profileInitials(string $name): string {
     return mb_substr($initials ?: 'U', 0, 2);
 }
 function profilePhotoPath(?string $photo): ?string {
-    if (!$photo || !preg_match('/^profile_[a-f0-9]{16}\.\.(?:jpg|jpeg|png|webp)$/', $photo)) return null;
+    if (!$photo || !preg_match('/^profile_[a-f0-9]{16}\.(?:jpg|jpeg|png|webp)$/', $photo)) return null;
     $full = __DIR__ . '/uploads/' . $photo;
     return is_file($full) ? 'uploads/' . $photo : null;
 }
